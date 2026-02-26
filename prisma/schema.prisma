@@ -1,0 +1,34 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/* User */
+model User {
+  /* Identification */
+  id               String @id @unique
+  email            String @unique
+  username         String @unique
+  discriminator    Int    @default(0) // only functions for bots in this day and age
+  
+  /* Profile */
+  displayName      String
+  pronouns         String @default("")
+  bio              String @default("")
+  avatarHash       String?
+  bannerHash       String?
+  accentColor      Int @default(0) /* 0x000000, black */
+
+  /* Login Info */
+  password         String
+  emailVerified    Boolean @default(false)
+
+  /* Special */
+  flags            BigInt @default(0)
+  isBot            Boolean @default(false)
+  isSystem         Boolean @default(false)
+}

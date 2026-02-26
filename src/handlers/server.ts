@@ -1,11 +1,12 @@
-import e, { NextFunction, Request, Response } from "express"
+import e from "express";
+import type { NextFunction, Request, Response } from "express";
 import fs from "fs/promises";
-import { BODY_SIZE_LIMIT, ENDPOINT_AUTHENTICATION_ENABLED, ENDPOINT_AUTH_HEADER, ENDPOINT_AUTH_VALUE, IS_DEBUG, PORT, PROJECT_NAME, SERVER_URL } from "../modules/constants";
-import { msg, warn } from "../modules/logger";
+import { BODY_SIZE_LIMIT, ENDPOINT_AUTHENTICATION_ENABLED, ENDPOINT_AUTH_HEADER, ENDPOINT_AUTH_VALUE, IS_DEBUG, PORT, PROJECT_NAME, SERVER_URL } from "modules/constants";
+import { msg, warn } from "modules/logger";
 import { italic, magenta, red, yellow } from "colorette";
 import path from "path";
 import cors from "cors";
-import { E_Lockdown, E_NotFound, E_ServerError } from "../modules/errors";
+import { E_Lockdown, E_NotFound, E_ServerError } from "modules/errors";
 
 export const app = e()
     .disable("etag")
@@ -17,7 +18,7 @@ export const app = e()
 async function init() {
     const files = (await fs
         // this next line is a disgrace to the human race
-        .readdir(path.join(".", (Symbol.for("ts-node.register.instance") in process ? "src" : "bin"), "routes")))
+        .readdir(path.join(".", "src", "routes")))
         .filter(f => f.endsWith(".js") || f.endsWith(".ts"));
 
     if (ENDPOINT_AUTHENTICATION_ENABLED)
