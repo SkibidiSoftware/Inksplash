@@ -1,6 +1,6 @@
 {
     "exclude": ["node_modules"],
-    "include": ["src"],
+    "include": ["src", "generated"],
     "compilerOptions": {
         /* Visit https://aka.ms/tsconfig to read more about this file */
         /* Projects */
@@ -38,9 +38,11 @@
         "types": ["node", "bun"] /* Specify type package names to be included without being referenced in a source file. */,
         "paths": {
             "@/*": ["./src/*"],
+            "#/*": ["./generated/*"],
             "handlers/*": ["./src/handlers/*"],
             "modules/*": ["./src/modules/*"],
             "routes/*": ["./src/routes/*"],
+            "classes/*": ["./src/classes/*"],
         },
         // "allowUmdGlobalAccess": true,                     /* Allow accessing UMD globals from modules. */
         // "moduleSuffixes": [],                             /* List of file name suffixes to search when resolving a module. */

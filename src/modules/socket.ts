@@ -1,5 +1,28 @@
 import { green } from "colorette";
-import { dbg } from "modules/logger";
+import { dbg, err, msg } from "modules/logger";
+import { constructPacket, receivePacket, type GatewayCompress, type GatewayEncoding } from "modules/compress";
+import type { GatewayIdentifyPacket } from "classes/packetsIncoming";
+import { getUserIdFromToken, isUserTokenValid } from "modules/token";
+
+export enum GatewayCapabilities {
+    LAZY_USER_NOTES = 1 << 0,
+    NO_AFFINE_USER_IDS = 1 << 1,
+    VERSIONED_READ_STATES = 1 << 2,
+    VERSIONED_USER_GUILD_SETTINGS = 1 << 3,
+    DEDUPE_USER_OBJECTS = 1 << 4,
+    PRIORITIZED_READY_PAYLOAD = 1 << 5,
+    MULTIPLE_GUILD_EXPERIMENT_POPULATIONS = 1 << 6,
+    NON_CHANNEL_READ_STATES = 1 << 7,
+    AUTH_TOKEN_REFRESH = 1 << 8,
+    USER_SETTINGS_PROTO = 1 << 9,
+    CLIENT_STATE_V2 = 1 << 10,
+    PASSIVE_GUILD_UPDATE = 1 << 11,
+    AUTO_CALL_CONNECT = 1 << 12,
+    DEBOUNCE_MESSAGE_REACTIONS = 1 << 13,
+    PASSIVE_GUILD_UPDATE_V2 = 1 << 14,
+    // 1 << 15
+    AUTO_LOBBY_CONNECT = 1 << 16,
+}
 
 export enum GatewayOp {
     DISPATCH                        = 0, // receive
@@ -48,34 +71,273 @@ export enum GatewayOp {
     REQUEST_CHANNEL_INFO            = 43, // send
 }
 
-export interface PacketBase {
+export enum GatewayCloseEventCode {
+    UNKNOWN_ERROR = 4000,
+    UNKNOWN_OPCODE = 4001,
+    DECODE_ERROR = 4002,
+    NOT_AUTHENTICATED = 4003,
+    AUTHENTICATION_FAILED = 4004,
+    ALREADY_AUTHENTICATED = 4005,
+    SESSION_NO_LONGER_VALID = 4006, // obsolete
+    INVALID_SEQUENCE = 4007,
+    RATE_LIMITED = 4008,
+    SESSION_TIMED_OUT = 4009, // same as 4006 i believe?
+    INVALID_SHARD = 4010,
+    SHARDING_REQUIRED = 4011,
+    INVALID_API_VERSION = 4012,
+    INVALID_INTENTS = 4013,
+    DISALLOWED_INTENTS = 4014,
+    TOO_MANY_SESSIONS = 4015,
+    CONNECTION_REQUEST_CANCELLED = 4016,
+}
+
+export type GatewayDispatchEvent =
+    | "READY"
+    | "READY_SUPPLEMENTAL"
+    | "RESUMED"
+    | "RATE_LIMITED"
+    | "REMOTE_COMMAND"
+    | "ACTIVITY_INVITE_CREATE"
+    | "AUTH_SESSION_CHANGE"
+    | "AUTHENTICATOR_CREATE"
+    | "AUTHENTICATOR_UPDATE"
+    | "AUTHENTICATOR_DELETE"
+    | "APPLICATION_COMMAND_PERMISSIONS_UPDATE"
+    | "AUTO_MODERATION_RULE_CREATE"
+    | "AUTO_MODERATION_RULE_UPDATE"
+    | "AUTO_MODERATION_RULE_DELETE"
+    | "AUTO_MODERATION_ACTION_EXECUTION"
+    | "AUTO_MODERATION_MENTION_RAID_DETECTION"
+    | "BILLING_POPUP_BRIDGE_CALLBACK"
+    | "CALL_CREATE"
+    | "CALL_UPDATE"
+    | "CALL_DELETE"
+    | "CHANNEL_CREATE"
+    | "CHANNEL_UPDATE"
+    | "CHANNEL_DELETE"
+    | "CHANNEL_UPDATE_PARTIAL"
+    | "CHANNEL_STATUSES"
+    | "CHANNEL_INFO"
+    | "CHANNEL_MEMBER_COUNT_UPDATE"
+    | "CHANNEL_UNREAD_UPDATE"
+    | "CHANNEL_PINS_UPDATE"
+    | "CHANNEL_PINS_ACK"
+    | "CHANNEL_RECIPIENT_ADD"
+    | "CHANNEL_RECIPIENT_REMOVE"
+    | "CONSOLE_COMMAND_UPDATE"
+    | "CONVERSATION_SUMMARY_UPDATE"
+    | "DM_SETTINGS_UPSELL_SHOW"
+    | "THREAD_CREATE"
+    | "THREAD_UPDATE"
+    | "THREAD_DELETE"
+    | "THREAD_LIST_SYNC"
+    | "THREAD_MEMBER_UPDATE"
+    | "THREAD_MEMBERS_UPDATE"
+    | "EMBEDDED_ACTIVITY_UPDATE_V2"
+    | "ENTITLEMENT_CREATE"
+    | "ENTITLEMENT_UPDATE"
+    | "ENTITLEMENT_DELETE"
+    | "EXPERIMENT_SESSION_OVERRIDE_CREATE"
+    | "EXPERIMENT_SESSION_OVERRIDE_DELETE"
+    | "FRIEND_SUGGESTION_CREATE"
+    | "FRIEND_SUGGESTION_DELETE"
+    | "GAME_SERVER_CREATE"
+    | "GAME_SERVER_UPDATE"
+    | "GAME_SERVER_DELETE"
+    | "GIFT_CODE_CREATE"
+    | "GIFT_CODE_UPDATE"
+    | "GUILD_CREATE"
+    | "GUILD_UPDATE"
+    | "GUILD_DELETE"
+    | "GUILD_APPLICATION_COMMAND_INDEX_UPDATE"
+    | "GUILD_APPLIED_BOOSTS_UPDATE"
+    | "GUILD_AUDIT_LOG_ENTRY_CREATE"
+    | "GUILD_BAN_ADD"
+    | "GUILD_BAN_REMOVE"
+    | "GUILD_DIRECTORY_ENTRY_CREATE"
+    | "GUILD_DIRECTORY_ENTRY_UPDATE"
+    | "GUILD_DIRECTORY_ENTRY_DELETE"
+    | "GUILD_EMOJIS_UPDATE"
+    | "GUILD_STICKERS_UPDATE"
+    | "GUILD_FEATURE_ACK"
+    | "GUILD_JOIN_REQUEST_CREATE"
+    | "GUILD_JOIN_REQUEST_UPDATE"
+    | "GUILD_JOIN_REQUEST_DELETE"
+    | "GUILD_MEMBER_ADD"
+    | "GUILD_MEMBER_UPDATE"
+    | "GUILD_MEMBER_REMOVE"
+    | "GUILD_MEMBERS_CHUNK"
+    | "GUILD_POWERUP_ENTITLEMENTS_CREATE"
+    | "GUILD_POWERUP_ENTITLEMENTS_DELETE"
+    | "GUILD_ROLE_CREATE"
+    | "GUILD_ROLE_UPDATE"
+    | "GUILD_ROLE_DELETE"
+    | "GUILD_SCHEDULED_EVENT_CREATE"
+    | "GUILD_SCHEDULED_EVENT_UPDATE"
+    | "GUILD_SCHEDULED_EVENT_DELETE"
+    | "GUILD_SCHEDULED_EVENT_EXCEPTION_CREATE"
+    | "GUILD_SCHEDULED_EVENT_EXCEPTION_UPDATE"
+    | "GUILD_SCHEDULED_EVENT_EXCEPTION_DELETE"
+    | "GUILD_SCHEDULED_EVENT_EXCEPTIONS_DELETE"
+    | "GUILD_SCHEDULED_EVENT_USER_ADD"
+    | "GUILD_SCHEDULED_EVENT_USER_REMOVE"
+    | "GUILD_SOUNDBOARD_SOUND_CREATE"
+    | "GUILD_SOUNDBOARD_SOUND_UPDATE"
+    | "GUILD_SOUNDBOARD_SOUND_DELETE"
+    | "SOUNDBOARD_SOUNDS"
+    | "GUILD_INTEGRATIONS_UPDATE"
+    | "INTEGRATION_CREATE"
+    | "INTEGRATION_UPDATE"
+    | "INTEGRATION_DELETE"
+    | "INTERACTION_CREATE"
+    | "INTERACTION_FAILURE"
+    | "INTERACTION_SUCCESS"
+    | "APPLICATION_COMMAND_AUTOCOMPLETE_RESPONSE"
+    | "INTERACTION_MODAL_CREATE"
+    | "INTERACTION_IFRAME_MODAL_CREATE"
+    | "SOCIAL_LAYER_SKU_PURCHASE_ELIGIBILITY_RESPONSE"
+    | "INVITE_CREATE"
+    | "INVITE_DELETE"
+    | "MESSAGE_CREATE"
+    | "MESSAGE_UPDATE"
+    | "MESSAGE_DELETE"
+    | "MESSAGE_DELETE_BULK"
+    | "MESSAGE_ACK"
+    | "MESSAGE_POLL_VOTE_ADD"
+    | "MESSAGE_POLL_VOTE_REMOVE"
+    | "MESSAGE_REACTION_ADD"
+    | "MESSAGE_REACTION_ADD_MANY"
+    | "MESSAGE_REACTION_REMOVE"
+    | "MESSAGE_REACTION_REMOVE_ALL"
+    | "MESSAGE_REACTION_REMOVE_EMOJI"
+    | "RECENT_MENTION_DELETE"
+    | "LAST_MESSAGES"
+    | "NOTIFICATION_CENTER_ITEM_CREATE"
+    | "NOTIFICATION_CENTER_ITEM_DELETE"
+    | "NOTIFICATION_CENTER_ITEMS_ACK"
+    | "NOTIFICATION_CENTER_ITEM_COMPLETED"
+    | "NOTIFICATION_SETTINGS_UPDATE"
+    | "OAUTH2_TOKEN_CREATE"
+    | "OAUTH2_TOKEN_DELETE"
+    | "OAUTH2_TOKEN_REVOKE"
+    | "PAYMENT_UPDATE"
+    | "PRESENCE_UPDATE"
+    | "QUESTS_USER_STATUS_UPDATE"
+    | "QUESTS_USER_COMPLETION_UPDATE"
+    | "RELATIONSHIP_ADD"
+    | "RELATIONSHIP_UPDATE"
+    | "RELATIONSHIP_REMOVE"
+    | "GAME_INVITE_CREATE"
+    | "GAME_INVITE_DELETE"
+    | "GAME_INVITE_DELETE_MANY"
+    | "GAME_RELATIONSHIP_ADD"
+    | "GAME_RELATIONSHIP_REMOVE"
+    | "LOBBY_CREATE"
+    | "LOBBY_UPDATE"
+    | "LOBBY_DELETE"
+    | "LOBBY_MEMBER_ADD"
+    | "LOBBY_MEMBER_UPDATE"
+    | "LOBBY_MEMBER_REMOVE"
+    | "LOBBY_MESSAGE_CREATE"
+    | "LOBBY_MESSAGE_UPDATE"
+    | "LOBBY_MESSAGE_DELETE"
+    | "LOBBY_VOICE_STATE_UPDATE"
+    | "LOBBY_VOICE_SERVER_UPDATE"
+    | "PASSIVE_UPDATE_V1"
+    | "PASSIVE_UPDATE_V2"
+    | "SAVED_MESSAGE_CREATE"
+    | "SAVED_MESSAGE_DELETE"
+    | "SESSIONS_REPLACE"
+    | "STAGE_INSTANCE_CREATE"
+    | "STAGE_INSTANCE_UPDATE"
+    | "STAGE_INSTANCE_DELETE"
+    | "STREAM_CREATE"
+    | "STREAM_SERVER_UPDATE"
+    | "STREAM_UPDATE"
+    | "STREAM_DELETE"
+    | "SPEED_TEST_CREATE"
+    | "SPEED_TEST_SERVER_UPDATE"
+    | "SPEED_TEST_UPDATE"
+    | "SPEED_TEST_DELETE"
+    | "TYPING_START"
+    | "USER_UPDATE"
+    | "USER_APPLICATION_UPDATE"
+    | "USER_APPLICATION_REMOVE"
+    | "USER_APPLICATION_IDENTITY_UPDATE"
+    | "USER_APPLICATION_IDENTITY_REMOVE"
+    | "USER_CONNECTIONS_UPDATE"
+    | "USER_GUILD_SETTINGS_UPDATE"
+    | "USER_MERGE_OPERATION_COMPLETED"
+    | "USER_NON_CHANNEL_ACK"
+    | "USER_NOTE_UPDATE"
+    | "USER_PAYMENT_BROWSER_CHECKOUT_DONE"
+    | "USER_PAYMENT_CLIENT_ADD"
+    | "USER_PAYMENT_SOURCES_UPDATE"
+    | "USER_SUBSCRIPTIONS_UPDATE"
+    | "USER_PREMIUM_GUILD_SUBSCRIPTION_SLOT_CREATE"
+    | "USER_PREMIUM_GUILD_SUBSCRIPTION_SLOT_UPDATE"
+    | "USER_PREMIUM_GUILD_SUBSCRIPTION_SLOT_DELETE"
+    | "USER_REQUIRED_ACTION_UPDATE"
+    | "USER_SETTINGS_UPDATE"
+    | "AUDIO_SETTINGS_UPDATE"
+    | "VOICE_STATE_UPDATE"
+    | "VOICE_SERVER_UPDATE"
+    | "VOICE_CHANNEL_EFFECT_SEND"
+    | "VOICE_CHANNEL_START_TIME_UPDATE"
+    | "VOICE_CHANNEL_STATUS_UPDATE"
+    | "VIRTUAL_CURRENCY_BALANCE_UPDATE"
+    | "WEBHOOKS_UPDATE";
+
+export interface PacketBase<T> {
     op: GatewayOp; // (op)eration code
-    d: unknown; // event (d)ata
+    d: T; // event (d)ata
     s?: number; // (s)equence number
-    t?: string // event name (DISPATCH opcode only)
+    t?: string // event (t)ype (DISPATCH opcode only)
 }
 
 export type GatewayClientData = {
     id: string;
     accountId: string;
     created: Date;
-    encoding: "etf" | "json";
-    compress: "none" | "zlib-stream" | "zstd-stream";
+    encoding: GatewayEncoding;
+    compress: GatewayCompress;
+    sequence: number;
 }
 
 export type GatewayClientSock = Bun.ServerWebSocket<GatewayClientData>;
 
-export function gatewaySend<T>(
+export async function gatewaySend<T>(
     client: GatewayClientSock,
     op: GatewayOp = GatewayOp.HEARTBEAT_ACK,
-    data?: T
+    data: { event?: GatewayDispatchEvent | null, content?: T } = { event: null },
 ) {
-    // todo, leave this to me i'll do it tomorrow
+    const p = await constructPacket(
+        { compress: client.data.compress, encoding: client.data.encoding },
+        op,
+        data?.content,
+        data?.event ?? null,
+        client.data.sequence);
+
+    if (!p) { err("ERROR: Gateway failed to send packet! Please investigate!!"); return; }
+    await client.sendBinary(p, false);
 }
 
-export function gatewayReceive(
+export async function gatewayReceive(
     ws: GatewayClientSock,
     data: string | Buffer<ArrayBuffer>
 ) {
-    dbg(`Message from ${green(ws.data.id)} received: ${data}`);
+    dbg(`Message from ${green(ws.data.id)} received`);
+    var p = await receivePacket<PacketBase<unknown>>({ encoding: ws.data.encoding }, data);
+    switch (p?.op) {
+        default: { dbg(`UNSUPPORTED OPCODE RECEIVED: ${p?.op}`); break; }
+        case GatewayOp.IDENTIFY: {
+            const d = p.d as GatewayIdentifyPacket;
+            
+            if (!await isUserTokenValid(d.token)) return ws.close(GatewayCloseEventCode.AUTHENTICATION_FAILED);
+            const uid = await getUserIdFromToken(d.token, true);
+            msg(`Gateway client ${green(ws.data.id)} authenticated as ${green(uid)}.`);
+            ws.data.accountId = uid;
+            break;
+        }
+    }
 }

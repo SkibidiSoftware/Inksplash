@@ -6,6 +6,9 @@
   "main": "bin/index.js",
   "scripts": {
     "build": "bunx --bun prisma generate",
+    "db:push": "bunx --bun prisma db push",
+    "db:reset": "bunx --bun prisma migrate reset && bunx --bun prisma db push && bunx --bun prisma db seed",
+    "db:seed": "bunx --bun prisma db seed",
     "start": "bun build && bun bin/index.js",
     "dev": "bun src/index.ts",
     "dev:watch": "bun --watch src/index.ts",

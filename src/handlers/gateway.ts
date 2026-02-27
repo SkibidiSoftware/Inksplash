@@ -1,9 +1,11 @@
 import { green } from "colorette";
 import { msg } from "modules/logger";
-import { INK_GATEWAY_PORT, PROJECT_NAME } from "modules/constants";
-import { gatewayReceive, type GatewayClientData } from "modules/socket";
+import { INK_GATEWAY_PORT, PROJECT_NAME, GATEWAY_IDENTIFIER, INK_GATEWAY_HEARTBEAT_INTERVAL_MS } from "modules/constants";
+import { GatewayOp, gatewayReceive, gatewaySend, type GatewayClientData } from "modules/socket";
+import type { GatewayHelloPacket } from "classes/packetsOutgoing";
 
 Bun.serve({
+    id: GATEWAY_IDENTIFIER,
     port: INK_GATEWAY_PORT,
     fetch(req, server) {
         const params = new URLSearchParams(req.url.split("?")[1]);
@@ -16,10 +18,11 @@ Bun.serve({
         const success = server.upgrade(req, {
             data: {
                 id: Bun.randomUUIDv7(),
-                accountId: "0",
+                accountId: "-1" /* not authenticated */,
                 created: new Date(),
                 encoding,
                 compress,
+                sequence: 0,
             }
         });
         if (success) return undefined;
@@ -34,6 +37,15 @@ Bun.serve({
 
         open: ws => {
             msg(`New client ${green(ws.data.id)} connected to the ${PROJECT_NAME} Gateway`);
+            gatewaySend<GatewayHelloPacket>(ws, GatewayOp.HELLO, {
+                content: {
+                    heartbeat_interval: INK_GATEWAY_HEARTBEAT_INTERVAL_MS,
+                    _trace: [ JSON.stringify([
+                        GATEWAY_IDENTIFIER,
+                        { micros: 0.0 }
+                    ]) ]
+                }
+            });
         },
         close: ws => {
             msg(`Client ${green(ws.data.id)} disconnected from the ${PROJECT_NAME} Gateway`);

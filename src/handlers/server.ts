@@ -1,7 +1,7 @@
 import e from "express";
 import type { NextFunction, Request, Response } from "express";
 import fs from "fs/promises";
-import { BODY_SIZE_LIMIT, ENDPOINT_AUTHENTICATION_ENABLED, ENDPOINT_AUTH_HEADER, ENDPOINT_AUTH_VALUE, IS_DEBUG, PORT, PROJECT_NAME, SERVER_URL } from "modules/constants";
+import { BODY_SIZE_LIMIT, ENDPOINT_AUTHENTICATION_ENABLED, ENDPOINT_AUTH_HEADER, ENDPOINT_AUTH_VALUE, IS_DEBUG, PORT, SERVER_URL, SERVICE_IDENTIFIER } from "modules/constants";
 import { msg, warn } from "modules/logger";
 import { italic, magenta, red, yellow } from "colorette";
 import path from "path";
@@ -49,7 +49,7 @@ async function init() {
         res.error(E_ServerError);
     });
     
-    app.listen(PORT, () => msg(`${magenta(PROJECT_NAME)} now up on port ${magenta(PORT)} ${(IS_DEBUG ? red("(debug environment)") : "")}`));
+    app.listen(PORT, () => msg(`Node ${magenta(SERVICE_IDENTIFIER)} now up on port ${magenta(PORT)} ${(IS_DEBUG ? red("(debug environment)") : "")}`));
 }
 
 init();
