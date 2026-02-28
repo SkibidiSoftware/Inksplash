@@ -1,3 +1,5 @@
+import { randomBytes } from "crypto";
+
 export const PROJECT_NAME = process.env.BASEDSERVER_PROJECT_NAME ?? "Inksplash"; // Default prefix for the logger module.
 export const PROJECT_VERSION = process.env.BASEDSERVER_PROJECT_VERSION ?? "1.0";
 export const BODY_SIZE_LIMIT = process.env.BASEDSERVER_BODY_SIZE_LIMIT ?? "50mb"; // Doesn't accept requests with body sizes larger than this value.
@@ -17,6 +19,7 @@ export const IS_DEBUG = ENVIRONMENT.toLowerCase().includes("develop") || ENVIRON
 
 export const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
 export const DATABASE_URL = process.env.DATABASE_URL ?? "postgres://test:test@localhost:11111/inksplash";
+export const PLACEHOLDER_ARGON_PASSWORD = Bun.password.hashSync(randomBytes(32).toString(), "argon2id");
 
 export const DISCORD_EPOCH = 1420070400000;
 export const SERVICE_IDENTIFIER = `${`${PROJECT_NAME}-${PROJECT_VERSION}`.toLowerCase().replace(/[\s\.]/ig, "-")}-${ENVIRONMENT.toLowerCase()}-${Math.round((Date.now() - DISCORD_EPOCH) / 1000)}`;
@@ -24,4 +27,5 @@ export const GATEWAY_IDENTIFIER = `gateway-${SERVICE_IDENTIFIER}`
 
 // --- Inksplash
 export const INK_GATEWAY_PORT = parseInt(process.env.INK_GATEWAY_PORT ?? "6688");
+export const INK_GATEWAY_HOST = process.env.INK_GATEWAY_HOST ?? `localhost:${INK_GATEWAY_PORT}`;
 export const INK_GATEWAY_HEARTBEAT_INTERVAL_MS = parseInt(process.env.INK_GATEWAY_HEARTBEAT_INTERVAL_MS ?? "41250")

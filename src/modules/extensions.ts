@@ -9,14 +9,14 @@ declare global {
         }
 
         interface Response {
-            error(err: ApiError, ...vars: string[]): void;
+            error(err: ApiError, object: any, ...vars: string[]): void;
         }
     }
 }
 
-express.response.error = function(err: ApiError, ...vars: string[]) {
+express.response.error = function(err: ApiError, object: any, ...vars: string[]) {
     if (this.statusCode === 200)
         this.status(err._statusCode);
 
-    this.json(err.package(...vars));
+    this.json(err.package(object, ...vars));
 }

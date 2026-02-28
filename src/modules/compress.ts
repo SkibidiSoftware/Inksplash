@@ -1,13 +1,14 @@
 import { pack, unpack } from "erlpack";
 import { err } from "modules/logger";
-import type { GatewayDispatchEvent, GatewayOp } from "modules/socket";
-import { constants, deflateSync } from "zlib";
+import type { GatewayClientData, GatewayDispatchEvent, GatewayOp } from "classes/gateway";
+import type { Deflate } from "fast-zlib";
 
 export type GatewayEncoding = "etf" | "json";
 export type GatewayCompress = "none" | "zlib-stream" | "zstd-stream";
 
-export function compressZlib(data: Buffer<ArrayBuffer>) {
-    return deflateSync(data, { finishFlush: constants.Z_SYNC_FLUSH });
+export function compressZlib(deflate: Deflate, data: Buffer<ArrayBuffer>) {
+    try { return deflate.process(data); }
+    catch (e) { err(`Couldn't compress package with Zlib: ${e}`); return null; }
 }
 
 export function compressZstd(data: Buffer<ArrayBuffer>) {
@@ -27,7 +28,7 @@ export function decompressEtf(data: Buffer<ArrayBuffer>) {
 
 // packets
 export async function constructPacket<T>(
-    options: { compress: GatewayCompress, encoding: GatewayEncoding },
+    options: { compress: GatewayCompress, zlibDeflate: Deflate, encoding: GatewayEncoding },
     op: GatewayOp,
     data: T,
     eventType: GatewayDispatchEvent | null = null,
@@ -56,7 +57,7 @@ export async function constructPacket<T>(
 
     switch (options.compress) {
         case "zlib-stream": {
-            const zlib = await compressZlib(packetBuffer);
+            const zlib = await compressZlib(options.zlibDeflate, packetBuffer);
             if (!zlib) {
                 err("Zlib compression fault!");
                 return null;

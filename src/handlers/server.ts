@@ -26,7 +26,7 @@ async function init() {
     
     app.use((req, res, next) => {
         if (ENDPOINT_AUTHENTICATION_ENABLED && req.header(ENDPOINT_AUTH_HEADER as string) !== ENDPOINT_AUTH_VALUE)
-            return res.error(E_Lockdown, SERVER_URL);
+            return res.error(E_Lockdown, {}, SERVER_URL);
 
         next();
     })
@@ -42,11 +42,11 @@ async function init() {
         msg(`Loaded route ${italic(file)} at ${italic(entryPoint)}!`);
     }
 
-    app.use((req, res) => res.error(E_NotFound, req.path));
+    app.use((req, res) => res.error(E_NotFound, {}, req.path));
 
     app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
         console.error(err);
-        res.error(E_ServerError);
+        res.error(E_ServerError, {});
     });
     
     app.listen(PORT, () => msg(`Node ${magenta(SERVICE_IDENTIFIER)} now up on port ${magenta(PORT)} ${(IS_DEBUG ? red("(debug environment)") : "")}`));

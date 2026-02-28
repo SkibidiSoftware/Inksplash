@@ -1,5 +1,6 @@
-import j from "joi";
+import j, { ValidationError } from "joi";
 import type { NextFunction, Request, Response } from "express";
+import { E_ValidationGeneric, E_ValidationSchema } from "modules/errors";
 
 export function validateBody(schema: j.Schema) {
     return async (req: Request, res: Response, next: NextFunction) => {
@@ -7,7 +8,12 @@ export function validateBody(schema: j.Schema) {
             req.body = await schema.validateAsync(req.body);
             next();
         } catch (err) {
-            res.status(400).json(err)
+            if (err instanceof ValidationError) {
+                res.error(E_ValidationSchema, {}, err.details.map(x => x.message).join(", "))
+                return;
+            }
+
+            res.error(E_ValidationGeneric, {}, "Failed validation");
         }
     }
 }
@@ -18,7 +24,12 @@ export function validateQuery(schema: j.Schema) {
             req.query = await schema.validateAsync(req.query);
             next();
         } catch (err) {
-            res.status(400).json(err)
+            if (err instanceof ValidationError) {
+                res.error(E_ValidationSchema, {}, err.details.map(x => x.message).join(", "))
+                return;
+            }
+
+            res.error(E_ValidationGeneric, {}, "Failed validation");
         }
     }
 }
@@ -28,8 +39,8 @@ export function validateParams(schema: j.Schema) {
         try {
             req.params = await schema.validateAsync(req.params);
             next();
-        } catch (err) {
-            res.status(400).json(err)
+        } catch (err) { // mystery error cuz we dont wanna reveal param names
+            res.error(E_ValidationGeneric, {}, "Malformed parameters");
         }
     }
 }

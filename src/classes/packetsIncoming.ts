@@ -1,4 +1,4 @@
-import type { GatewayCapabilities } from "modules/socket";
+import type { GatewayCapabilities } from "classes/gateway";
 
 export interface GatewayIdentifyProperties {
     os: string;

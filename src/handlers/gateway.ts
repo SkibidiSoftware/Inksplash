@@ -1,8 +1,10 @@
 import { green } from "colorette";
 import { msg } from "modules/logger";
 import { INK_GATEWAY_PORT, PROJECT_NAME, GATEWAY_IDENTIFIER, INK_GATEWAY_HEARTBEAT_INTERVAL_MS } from "modules/constants";
-import { GatewayOp, gatewayReceive, gatewaySend, type GatewayClientData } from "modules/socket";
+import { gatewayReceive, gatewaySend } from "modules/socket";
+import { GatewayOp, type GatewayClientData } from "classes/gateway";
 import type { GatewayHelloPacket } from "classes/packetsOutgoing";
+import { constants, Deflate } from "fast-zlib";
 
 Bun.serve({
     id: GATEWAY_IDENTIFIER,
@@ -20,9 +22,12 @@ Bun.serve({
                 id: Bun.randomUUIDv7(),
                 accountId: "-1" /* not authenticated */,
                 created: new Date(),
+                lastHeartbeat: new Date(),
                 encoding,
                 compress,
                 sequence: 0,
+
+                deflate: new Deflate({ chunkSize: 65535, flush: constants.Z_SYNC_FLUSH })
             }
         });
         if (success) return undefined;
@@ -33,6 +38,7 @@ Bun.serve({
         return Response.json({ success: false, message: e.message });
     },
     websocket: {
+        idleTimeout: Math.ceil(INK_GATEWAY_HEARTBEAT_INTERVAL_MS / 1000) + 5,
         data: {} as GatewayClientData,
 
         open: ws => {

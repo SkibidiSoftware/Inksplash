@@ -21,7 +21,7 @@ export function requireService(service: ServiceType) {
             return next();
 
         if (serviceType !== service)
-            return res.error(E_NotFound, `${req.baseUrl}${req.url}`);
+            return res.error(E_NotFound, {}, `${req.baseUrl}${req.url}`);
 
         next();
     }
